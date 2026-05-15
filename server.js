@@ -8,7 +8,8 @@ const playerRoom = new Map();
 const connPlayer = new Map();
 
 function log(msg) {
-    console.log(`[${new Date().toISOString()}] ${msg}`);
+    // Убираем лишнее логирование для уменьшения нагрузки
+    // console.log(`[${new Date().toISOString()}] ${msg}`);
 }
 
 function send(ws, data) {
@@ -93,21 +94,21 @@ wss.on('connection', (ws) => {
                 const room = rooms.get(playerRoom.get(playerId));
                 if (!room) break;
                 const player = room.players.get(playerId);
-                log(`event from slot=${player?.slot} type=${data.event} room=${room.id} size=${room.players.size}`);
+                // Убираем логирование для уменьшения задержки
+                // log(`event from slot=${player?.slot} type=${data.event}`);
                 broadcastRoom(room, { ...data, fromPlayer: playerId, fromSlot: player?.slot || 0 }, playerId);
                 break;
             }
-            // New: direct relay - relay to opponent without broadcast exclusion
             case 'relay': {
                 if (!playerId) break;
                 const room = rooms.get(playerRoom.get(playerId));
                 if (!room) break;
                 const player = room.players.get(playerId);
-                log(`relay from slot=${player?.slot} sub=${data.sub}`);
                 broadcastRoom(room, { ...data, type: 'relay', fromSlot: player?.slot || 0 }, playerId);
                 break;
             }
             case 'ping':
+                // Быстрый ответ на ping
                 send(ws, { type: 'pong', ts: data.ts });
                 break;
             case 'leave':
