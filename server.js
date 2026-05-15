@@ -30,11 +30,14 @@ function findOrCreateRoom() {
 
 function broadcastRoom(room, data, excludeId = null) {
     const json = JSON.stringify(data);
+    let sent = 0;
     for (const [pid, player] of room.players) {
         if (pid !== excludeId && player.ws.readyState === WebSocket.OPEN) {
             player.ws.send(json);
+            sent++;
         }
     }
+    log(`broadcast type=${data.type} event=${data.event||''} to ${sent} players (excluded=${excludeId ? 'yes' : 'no'})`);
 }
 
 function handleLeave(playerId) {
@@ -43,7 +46,7 @@ function handleLeave(playerId) {
     const room = rooms.get(roomId);
     if (!room) return;
 
-    broadcastRoom(room, { type: 'player_left', playerId });
+    broadcastRoom(room, { type: 'player_left', playerId }, playerId);
     room.players.delete(playerId);
     playerRoom.delete(playerId);
     log(`Player ${playerId} left room ${roomId} (${room.players.size} left)`);
@@ -80,14 +83,14 @@ wss.on('connection', (ws) => {
                     playerId:     pid,
                     playersCount: room.players.size,
                 });
-                log(`Player ${pid} joined room ${room.id} (${room.players.size}/2)`);
+                log(`Player ${pid} slot=${slot} joined room ${room.id} (${room.players.size}/2)`);
 
                 if (room.players.size === 2) {
                     room.state = 'playing';
                     const slots = {};
                     for (const [id, p] of room.players) slots[id] = p.slot;
-                    broadcastRoom(room, { type: 'game_start', room: room.id, slots });
-                    log(`Room ${room.id} started!`);
+                    broadcastRoom(room, { type: 'game_start', room: room.id, slots }, null);
+                    log(`Room ${room.id} started! slots=${JSON.stringify(slots)}`);
                 }
                 break;
             }
@@ -119,8 +122,9 @@ wss.on('connection', (ws) => {
                 if (!playerId) break;
                 const roomId = playerRoom.get(playerId);
                 const room   = rooms.get(roomId);
-                if (!room) break;
+                if (!room) { log(`ERROR: no room for player ${playerId}`); break; }
                 const player = room.players.get(playerId);
+                log(`event from ${playerId} slot=${player?.slot} type=${data.event} roomSize=${room.players.size}`);
                 broadcastRoom(room, {
                     ...data,
                     fromPlayer: playerId,
