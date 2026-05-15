@@ -94,10 +94,54 @@ wss.on('connection', (ws) => {
                 if (!room) break;
                 const player = room.players.get(playerId);
                 log(`event from slot=${player?.slot} type=${data.event} room=${room.id} size=${room.players.size}`);
-                broadcastRoom(room, { ...data, fromPlayer: playerId, fromSlot: player?.slot || 0 }, playerId);
+                
+                // Special handling for full state request
+                if (data.event === 'request_full_state') {
+                    // Find master (slot 1) and forward request
+                    for (const [pid, p] of room.players) {
+                        if (p.slot === 1) {
+                            log(`Forwarding full_state_request to master ${pid}`);
+                            send(p.ws, {
+                                type: 'event',
+                                event: 'send_full_state',
+                                targetSlot: player?.slot || 2
+                            });
+                            break;
+                        }
+                    }
+                } else if (data.event === 'full_state_sync') {
+                    // Forward full state to the requesting slave
+                    for (const [pid, p] of room.players) {
+                        if (p.slot !== player?.slot) {
+                            log(`Forwarding full_state_sync to player ${pid} (slot ${p.slot})`);
+                            send(p.ws, {
+                                type: 'event',
+                                event: 'full_state_sync',
+                                enemies: data.data?.enemies || [],
+                                data: data.data
+                            });
+                            break;
+                        }
+                    }
+                } else if (data.event === 'send_full_state') {
+                    // Master received request to send state, forward to master
+                    for (const [pid, p] of room.players) {
+                        if (p.slot === 1) {
+                            log(`Forwarding send_full_state to master ${pid}`);
+                            send(p.ws, {
+                                type: 'event',
+                                event: data.event,
+                                targetSlot: data.targetSlot
+                            });
+                            break;
+                        }
+                    }
+                } else {
+                    // Normal event broadcast
+                    broadcastRoom(room, { ...data, fromPlayer: playerId, fromSlot: player?.slot || 0 }, playerId);
+                }
                 break;
             }
-            // New: direct relay - relay to opponent without broadcast exclusion
             case 'relay': {
                 if (!playerId) break;
                 const room = rooms.get(playerRoom.get(playerId));
