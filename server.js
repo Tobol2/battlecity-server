@@ -97,10 +97,11 @@ wss.on('connection', (ws) => {
                 
                 // Special handling for full state request
                 if (data.event === 'request_full_state') {
+                    log(`Processing request_full_state from slot ${player?.slot}`);
                     // Find master (slot 1) and forward request
                     for (const [pid, p] of room.players) {
                         if (p.slot === 1) {
-                            log(`Forwarding full_state_request to master ${pid}`);
+                            log(`Forwarding request_full_state to master ${pid}`);
                             send(p.ws, {
                                 type: 'event',
                                 event: 'send_full_state',
@@ -110,6 +111,7 @@ wss.on('connection', (ws) => {
                         }
                     }
                 } else if (data.event === 'full_state_sync') {
+                    log(`Processing full_state_sync from slot ${player?.slot}`);
                     // Forward full state to the requesting slave
                     for (const [pid, p] of room.players) {
                         if (p.slot !== player?.slot) {
@@ -124,6 +126,7 @@ wss.on('connection', (ws) => {
                         }
                     }
                 } else if (data.event === 'send_full_state') {
+                    log(`Processing send_full_state for targetSlot ${data.targetSlot}`);
                     // Master received request to send state, forward to master
                     for (const [pid, p] of room.players) {
                         if (p.slot === 1) {
